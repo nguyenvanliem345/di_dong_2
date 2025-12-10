@@ -1,16 +1,15 @@
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Link } from "expo-router";
 import {
-  View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -107,9 +106,12 @@ export default function LoginScreen() {
               <Text style={styles.checkboxLabel}>Ghi nhớ đăng nhập</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity>
-              <Text style={styles.forgotPassword}>Quên mật khẩu?</Text>
-            </TouchableOpacity>
+          <TouchableOpacity>
+  <Link href="/forgetPassword" asChild>
+    <Text style={styles.forgotPassword}>Quên mật khẩu?</Text>
+  </Link>
+</TouchableOpacity>
+
           </View>
 
           {/* Submit Button */}
