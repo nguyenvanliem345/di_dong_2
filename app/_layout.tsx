@@ -1,24 +1,37 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const segments = useSegments();
+  const router = useRouter();
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      // Lấy dữ liệu người dùng từ bộ nhớ
+      const user = await AsyncStorage.getItem('user');
+      const inAuthGroup = segments[0] === '(auth)';
+
+      if (!user && !inAuthGroup) {
+        // Nếu không có user và chưa ở nhóm Login -> Chuyển về Login
+        router.replace('/(auth)/Login');
+      } else if (user && inAuthGroup) {
+        // Nếu đã có user mà đang ở Login -> Vào ngay App chính
+        router.replace('/(tabs)');
+      }
+      setIsLoaded(true);
+    };
+
+    checkAuth();
+  }, [segments]); // Lắng nghe sự thay đổi của đường dẫn
+
+  if (!isLoaded) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   );
 }
