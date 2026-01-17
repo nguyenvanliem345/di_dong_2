@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { CategoryList } from './CategoryList';
-import { ProductList } from './ProductList';
+import React, { useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
+import { CategoryList } from "./CategoryList";
+import { ProductList } from "./ProductList";
 
 // Định nghĩa kiểu dữ liệu để hết lỗi "Property does not exist"
 type MenuDiscoveryProps = {
@@ -9,7 +9,10 @@ type MenuDiscoveryProps = {
   onSelectCategory: (id: number | null) => void;
 };
 
-export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps) => {
+export const MenuDiscovery = ({
+  products,
+  onSelectCategory,
+}: MenuDiscoveryProps) => {
   const [localCategoryId, setLocalCategoryId] = useState<number | null>(null);
 
   const handleSelect = (id: number | null) => {
@@ -18,10 +21,29 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
   };
 
   return (
-    <View style={{ backgroundColor: '#C62828', paddingVertical: 30, borderTopLeftRadius: 30, borderTopRightRadius: 30 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 25, alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>Khám phá menu</Text>
-        <TouchableOpacity><Text style={{ color: '#fff', opacity: 0.8 }}>xem thêm</Text></TouchableOpacity>
+    <View
+      style={{
+        backgroundColor: "#C62828",
+        paddingVertical: 30,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          paddingHorizontal: 20,
+          marginBottom: 25,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>
+          Khám phá menu
+        </Text>
+        <TouchableOpacity>
+          <Text style={{ color: "#fff", opacity: 0.8 }}>xem thêm</Text>
+        </TouchableOpacity>
       </View>
 
       <CategoryList onSelectCategory={handleSelect} />
@@ -41,7 +63,7 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 
 //   // Tạo danh sách sản phẩm hiển thị dựa trên danh mục đang chọn
 //   // Trong MenuDiscovery.tsx
-// const displayProducts = activeCat 
+// const displayProducts = activeCat
 //   ? products.filter((p: any) => {
 //       const idMatch = p.category_id && Number(p.category_id) === Number(activeCat);
 //       const objMatch = p.category && Number(p.category.id) === Number(activeCat);
@@ -78,9 +100,9 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //         </TouchableOpacity>
 
 //         {categories.map((cat: any) => (
-//           <TouchableOpacity 
-//             key={cat.id.toString()} 
-//             onPress={() => handlePress(cat.id)} 
+//           <TouchableOpacity
+//             key={cat.id.toString()}
+//             onPress={() => handlePress(cat.id)}
 //             style={styles.categoryItem}
 //           >
 //             <View style={[styles.categoryIcon, activeCat === cat.id && {borderColor: '#FFD700', borderWidth: 2}]}>
@@ -92,9 +114,9 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //       </ScrollView>
 
 //       {/* THAY ĐỔI Ở ĐÂY: Dùng displayProducts thay vì products.slice */}
-//       <ScrollView 
-//         horizontal 
-//         showsHorizontalScrollIndicator={false} 
+//       <ScrollView
+//         horizontal
+//         showsHorizontalScrollIndicator={false}
 //         style={styles.featuredScroll}
 //         contentContainerStyle={{ paddingRight: 30 }}
 //       >
@@ -102,9 +124,9 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //           displayProducts.map((item: any) => (
 //             <View key={item.id.toString()} style={styles.featuredCard}>
 //               <View style={styles.imageOverlap}>
-//                 <Image 
-//                   source={{ uri: API_CONFIG.IMAGE_URL("products", item.photo) }} 
-//                   style={styles.circleImg} 
+//                 <Image
+//                   source={{ uri: API_CONFIG.IMAGE_URL("products", item.photo) }}
+//                   style={styles.circleImg}
 //                 />
 //               </View>
 //               <View style={styles.cardBody}>
@@ -121,20 +143,19 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //     </View>
 //   );
 // };
- 
 
 // const styles = StyleSheet.create({
-//   menuDiscoverySection: { 
-//     backgroundColor: '#C62828', 
-//     paddingVertical: 30, 
+//   menuDiscoverySection: {
+//     backgroundColor: '#C62828',
+//     paddingVertical: 30,
 //     marginTop: 20,
 //     borderTopLeftRadius: 30,
 //     borderTopRightRadius: 30,
 //   },
-//   sectionHeaderRow: { 
-//     flexDirection: 'row', 
-//     justifyContent: 'space-between', 
-//     paddingHorizontal: 20, 
+//   sectionHeaderRow: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     paddingHorizontal: 20,
 //     marginBottom: 25,
 //     alignItems: 'center'
 //   },
@@ -142,8 +163,8 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //   seeMoreWhite: { color: '#fff', fontSize: 13, opacity: 0.8 },
 //   categoryScroll: { paddingLeft: 20, marginBottom: 40 },
 //   categoryItem: { alignItems: 'center', marginRight: 25 },
-//   categoryIcon: { 
-//     width: 55, height: 55, borderRadius: 15, 
+//   categoryIcon: {
+//     width: 55, height: 55, borderRadius: 15,
 //     backgroundColor: '#fff', overflow: 'hidden',
 //     justifyContent: 'center', alignItems: 'center',
 //     elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5
@@ -151,11 +172,11 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //   catImage: { width: '100%', height: '100%', resizeMode: 'cover' },
 //   categoryLabel: { color: '#fff', fontSize: 12, marginTop: 10, fontWeight: '600' },
 //   featuredScroll: { paddingLeft: 20 },
-//   featuredCard: { 
-//     width: 160, 
-//     backgroundColor: '#fff', 
-//     borderRadius: 20, 
-//     marginRight: 20, 
+//   featuredCard: {
+//     width: 160,
+//     backgroundColor: '#fff',
+//     borderRadius: 20,
+//     marginRight: 20,
 //     marginTop: 45,
 //     paddingBottom: 20,
 //     alignItems: 'center',
@@ -165,8 +186,8 @@ export const MenuDiscovery = ({ products, onSelectCategory }: MenuDiscoveryProps
 //     })
 //   },
 //   imageOverlap: { marginTop: -50, zIndex: 10 },
-//   circleImg: { 
-//     width: 100, height: 100, borderRadius: 50, 
+//   circleImg: {
+//     width: 100, height: 100, borderRadius: 50,
 //     borderWidth: 5, borderColor: '#fff',
 //   },
 //   cardBody: { alignItems: 'center', paddingHorizontal: 12, marginTop: 10 },

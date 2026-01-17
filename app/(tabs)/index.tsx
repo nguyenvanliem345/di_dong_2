@@ -1,87 +1,123 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import { API_CONFIG } from "../../apiConfig";
 import { BannerSlider } from "./components/BannerSlider";
 import { FoodCard } from "./components/FoodCard";
 import { Header } from "./components/Header";
-import { MenuDiscovery } from "./components/MenuDiscovery"; // Đảm bảo đã import cái này
+import { MenuDiscovery } from "./components/MenuDiscovery";
 import { QuickActions } from "./components/QuickActions";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const APP_WIDTH = width > 500 ? 414 : width;
 
 export default function DishDashApp() {
   const [ads, setAds] = useState([]);
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]); // Danh sách sau khi lọc
   const [loading, setLoading] = useState(true);
+
+  // 1. Thêm State để quản lý từ khóa tìm kiếm và danh mục đang chọn
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     Promise.all([
-      fetch(API_CONFIG.SLIDESHOWS).then(res => res.json()),
-      fetch(API_CONFIG.PRODUCTS).then(res => res.json())
+      fetch(API_CONFIG.SLIDESHOWS).then((res) => res.json()),
+      fetch(API_CONFIG.PRODUCTS).then((res) => res.json()),
     ])
-    .then(([slidesData, productsData]) => {
-      const pData = productsData.content || productsData;
-      setAds(slidesData.content || slidesData);
-      setProducts(pData);
-      setFilteredProducts(pData); // Mặc định hiện tất cả
-      setLoading(false);
-    }).catch(() => setLoading(false));
+      .then(([slidesData, productsData]) => {
+        const pData = productsData.content || productsData;
+        setAds(slidesData.content || slidesData);
+        setProducts(pData);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
-  // Hàm xử lý lọc món ăn
- const handleFilter = (categoryId: number | null) => {
-  if (categoryId === null) {
-    setFilteredProducts(products);
-  } else {
-    const filtered = products.filter((p: any) => {
-      // 1. Kiểm tra nếu p.category_id là số/chuỗi trực tiếp
-      const directMatch = p.category_id && Number(p.category_id) === Number(categoryId);
+  // 2. Logic Lọc tổng hợp: Kết hợp tìm kiếm và danh mục
+  // Dùng useMemo để danh sách tự cập nhật mỗi khi searchQuery hoặc selectedCategoryId thay đổi
+  const filteredProducts = useMemo(() => {
+    return products.filter((p: any) => {
+      // Điều kiện 1: Lọc theo Category
+      let matchesCategory = true;
+      if (selectedCategoryId !== null) {
+        const directMatch =
+          p.category_id && Number(p.category_id) === Number(selectedCategoryId);
+        const objectMatch =
+          p.category && Number(p.category.id) === Number(selectedCategoryId);
+        matchesCategory = directMatch || objectMatch;
+      }
 
-      // 2. Kiểm tra nếu category là một Object lồng nhau (Cấu trúc thường gặp của JPA/Hibernate)
-      const objectMatch = p.category && Number(p.category.id) === Number(categoryId);
+      // Điều kiện 2: Lọc theo Tìm kiếm
+      let matchesSearch = true;
+      if (searchQuery.trim() !== "") {
+        const keyword = searchQuery.toLowerCase().trim();
+        const title = (p.name || p.title || "").toLowerCase();
+        matchesSearch = title.includes(keyword);
+      }
 
-      // 3. Dự phòng lọc theo tên danh mục hiển thị
-      const nameMatch = p.category_title === "Món Hấp" && Number(categoryId) === 1;
-
-      return directMatch || objectMatch || nameMatch;
+      return matchesCategory && matchesSearch;
     });
-    setFilteredProducts(filtered);
-  }
-};
+  }, [products, selectedCategoryId, searchQuery]);
+
+  if (loading)
+    return (
+      <ActivityIndicator size="large" color="#C62828" style={{ flex: 1 }} />
+    );
 
   return (
     <View style={styles.masterContainer}>
       <View style={styles.container}>
-        <Header />
+        {/* 3. Truyền state tìm kiếm vào Header */}
+        <Header
+          value={searchQuery}
+          onChangeText={(text: string) => setSearchQuery(text)}
+        />
+
         <ScrollView showsVerticalScrollIndicator={false}>
           <BannerSlider ads={ads} />
           <QuickActions />
 
-          {/* Phần Giảm giá ăn ngon giờ sẽ hiển thị danh sách đã lọc */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Món ngon dành cho bạn</Text>
+            <Text style={styles.sectionTitle}>
+              {searchQuery
+                ? `Kết quả cho "${searchQuery}"`
+                : "Món ngon dành cho bạn"}
+            </Text>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.foodHorizontalList}>
-            {filteredProducts.map((item: any) => (
-              <FoodCard key={item.id} item={item} />
-            ))}
+          {/* 4. Hiển thị FoodCard dựa trên danh sách đã lọc */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.foodHorizontalList}
+          >
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map((item: any) => (
+                <FoodCard key={item.id} item={item} />
+              ))
+            ) : (
+              <Text
+                style={{ marginLeft: 15, color: "#999", paddingVertical: 20 }}
+              >
+                Không tìm thấy món phù hợp
+              </Text>
+            )}
           </ScrollView>
 
-          {/* Truyền hàm lọc vào MenuDiscovery */}
-          <MenuDiscovery 
-            products={products} 
-            onSelectCategory={handleFilter} 
+          <MenuDiscovery
+            products={products}
+            onSelectCategory={(id) => setSelectedCategoryId(id)}
           />
-          
+
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
@@ -89,45 +125,23 @@ export default function DishDashApp() {
   );
 }
 
+// ... Styles giữ nguyên như cũ của bạn
 const styles = StyleSheet.create({
-  masterContainer: { 
-    flex: 1, 
-    backgroundColor: "#000", 
-    alignItems: "center", 
-    justifyContent: "center" 
+  masterContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  container: { 
-    flex: 1, 
-    backgroundColor: "#fff", 
-    width: APP_WIDTH 
-  },
-  loadingCenter: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#fff' 
-  },
-  sectionHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 15, 
-    marginTop: 25, 
+  container: { flex: 1, backgroundColor: "#fff", width: APP_WIDTH },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    marginTop: 25,
     marginBottom: 10,
-    alignItems: 'center' 
+    alignItems: "center",
   },
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#333' 
-  },
-  seeMore: { 
-    color: '#C62828', 
-    fontSize: 12, 
-    fontWeight: '600' 
-  },
-  foodHorizontalList: {
-    paddingLeft: 15,
-    paddingRight: 15,
-    paddingBottom: 10,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
+  foodHorizontalList: { paddingLeft: 15, paddingRight: 15, paddingBottom: 10 },
 });
