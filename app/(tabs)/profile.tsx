@@ -1,248 +1,372 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Feather } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Animated,
   Image,
-  Modal,
   Platform,
+  RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { API_CONFIG } from '../../apiConfig';
+  View,
+} from "react-native";
+import { API_CONFIG } from "../../apiConfig";
 
-export default function ProfileScreen() {
+/* 🎨 MÀU SÁNG – PHÙ HỢP APP ĐỒ ĂN */
+const COLORS = {
+  primary: "#FF7A00", // cam đồ ăn
+  dark: "#1D1D1F",
+  secondary: "#8E8E93",
+  background: "#FFF7ED",
+  white: "#FFFFFF",
+  danger: "#FF3B30",
+};
+
+export default function Profile() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [isEditNameModal, setEditNameModal] = useState(false);
-  const [newName, setNewName] = useState('');
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, { 
-      toValue: 1, 
-      duration: 800, 
-      useNativeDriver: true 
-    }).start();
+  /* LOAD USER KHI VÀO MÀN */
+  useFocusEffect(
+    useCallback(() => {
+      checkLoginStatus();
+    }, []),
+  );
 
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    const userData = await AsyncStorage.getItem('user');
-    if (userData) {
-      const parsed = JSON.parse(userData);
-      setUser(parsed);
-      setNewName(parsed.username || '');
+  const checkLoginStatus = async () => {
+    try {
+      const jsonValue = await AsyncStorage.getItem("userData");
+      setUserData(jsonValue ? JSON.parse(jsonValue) : null);
+    } catch (e) {
+      console.error("Lỗi đọc user:", e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleUpdateName = async () => {
-    if (!newName.trim()) return;
-    // Logic cập nhật tên (Ở đây mình cập nhật local, bạn hãy gọi thêm API update nhé)
-    const updatedUser = { ...user, username: newName };
-    await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-    setUser(updatedUser);
-    setEditNameModal(false);
-    Alert.alert("Thành công", "Đã cập nhật tên hiển thị!");
-  };
+  /* LOGOUT */
+  /* LOGOUT - Đã sửa lỗi Web */
+  const handleLogout = async () => {
+    // Tách hàm xử lý xóa dữ liệu để dùng chung
+    const performLogout = async () => {
+      try {
+        await AsyncStorage.multiRemove(["userData", "userToken", "userId"]);
+        setUserData(null);
+        // Dùng replace để không quay lại được màn hình profile sau khi logout
+        router.replace("/(auth)/login");
+      } catch (error) {
+        console.error("Lỗi khi đăng xuất:", error);
+      }
+    };
 
-  const performLogout = async () => {
-    await AsyncStorage.clear(); 
-    router.replace('/(auth)/Login' as any);
-  };
-
-  const handleLogout = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) performLogout();
+    // Kiểm tra nền tảng
+    if (Platform.OS === "web") {
+      // Trên Web dùng window.confirm
+      if (window.confirm("Bạn chắc chắn muốn đăng xuất?")) {
+        await performLogout();
+      }
     } else {
-      Alert.alert("Xác nhận", "Bạn có chắc chắn muốn đăng xuất?", [
+      // Trên Mobile (iOS/Android) dùng Alert.alert
+      Alert.alert("Đăng xuất", "Bạn chắc chắn muốn đăng xuất?", [
         { text: "Hủy", style: "cancel" },
-        { text: "Đăng xuất", style: "destructive", onPress: performLogout }
+        {
+          text: "Đăng xuất",
+          style: "destructive",
+          onPress: performLogout,
+        },
       ]);
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    checkLoginStatus();
+  };
+
+  const navigateToHistory = () => {
+    if (!userData) {
+      Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để xem đơn hàng.", [
+        { text: "Hủy", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/(auth)/login") },
+      ]);
+      return;
+    }
+    router.push("/order-history");
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.avatarWrapper}>
-            <View style={styles.avatarContainer}>
-              {user?.photo ? (
-                <Image 
-                  source={{ uri: API_CONFIG.IMAGE_URL("users", user.photo) }} 
-                  style={styles.avatar} 
-                />
-              ) : (
-                <Ionicons name="person-circle" size={100} color="#C62828" />
-              )}
-            </View>
-            <View style={styles.editBadge}>
-              <Ionicons name="camera" size={16} color="#fff" />
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.username}>{user?.username || 'Người dùng'}</Text>
-          <Text style={styles.email}>{user?.email || 'Chưa cập nhật email'}</Text>
-        </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-        {/* THỐNG KÊ NHANH */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statCount}>12</Text>
-            <Text style={styles.statLabel}>Đơn hàng</Text>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Tài khoản</Text>
+          <Text style={styles.headerSubtitle}>
+            {userData ? "Chào mừng bạn quay lại 👋" : "Khách HEDIO"}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.iconBtn}>
+          <Feather name="settings" size={20} color={COLORS.dark} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* USER CARD */}
+        <TouchableOpacity
+          style={styles.userCard}
+          activeOpacity={0.9}
+          onPress={() =>
+            userData
+              ? router.push("/edit-profile")
+              : router.push("/(auth)/login")
+          }
+        >
+          <Image
+            source={{
+              uri: userData?.avatar
+                ? `${API_CONFIG.BASE_URL}/uploads/user/${userData.avatar}`
+                : `https://ui-avatars.com/api/?name=${
+                    userData?.fullName || "HEDIO"
+                  }&background=FF7A00&color=fff&size=128`,
+            }}
+            style={styles.avatar}
+          />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>
+              {userData?.fullName || "Đăng nhập / Đăng ký"}
+            </Text>
+            <Text style={styles.userEmail}>
+              {userData?.email || "Nhận ưu đãi món ngon mỗi ngày 🍔"}
+            </Text>
+
+            {userData && (
+              <LinearGradient
+                colors={["#FF7A00", "#FF9F0A"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.badge}
+              >
+                <Feather name="star" size={10} color="#FFF" />
+                <Text style={styles.badgeText}>HEDIO MEMBER</Text>
+              </LinearGradient>
+            )}
           </View>
-          <View style={[styles.statBox, styles.statBorder]}>
-            <Text style={styles.statCount}>5</Text>
-            <Text style={styles.statLabel}>Yêu thích</Text>
+          <Feather name="chevron-right" size={20} color={COLORS.secondary} />
+        </TouchableOpacity>
+
+        {/* ĐƠN HÀNG */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Đơn hàng của bạn</Text>
+            <TouchableOpacity onPress={navigateToHistory}>
+              <Text style={styles.seeAll}>Xem tất cả</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statCount}>200k</Text>
-            <Text style={styles.statLabel}>Ví xu</Text>
-          </View>
-        </View>
 
-        {/* MENU CHỨC NĂNG */}
-        <Text style={styles.sectionTitle}>Tài khoản của tôi</Text>
-        <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => setEditNameModal(true)}>
-            <View style={[styles.iconBox, { backgroundColor: '#3b82f6' }]}>
-              <Ionicons name="person-outline" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Thay đổi tên hiển thị</Text>
-            <Ionicons name="chevron-forward" size={18} color="#475569" />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={() => router.push('/(auth)/ChangePassword' as any)}
-          >
-            <View style={[styles.iconBox, { backgroundColor: '#8b5cf6' }]}>
-              <Ionicons name="lock-closed-outline" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Đổi mật khẩu</Text>
-            <Ionicons name="chevron-forward" size={18} color="#475569" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={[styles.iconBox, { backgroundColor: '#f59e0b' }]}>
-              <Ionicons name="location-outline" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Địa chỉ đã lưu</Text>
-            <Ionicons name="chevron-forward" size={18} color="#475569" />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.sectionTitle}>Khác</Text>
-        <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={[styles.iconBox, { backgroundColor: '#10b981' }]}>
-              <Ionicons name="help-buoy-outline" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Trung tâm trợ giúp</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-            <View style={[styles.iconBox, { backgroundColor: '#ef4444' }]}>
-              <Ionicons name="log-out-outline" size={20} color="#fff" />
-            </View>
-            <Text style={[styles.menuText, { color: '#ef4444', fontWeight: '600' }]}>Đăng xuất</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* MODAL ĐỔI TÊN */}
-      <Modal visible={isEditNameModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Đổi tên hiển thị</Text>
-            <TextInput 
-              style={styles.input}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Nhập tên mới..."
-              placeholderTextColor="#94a3b8"
+          <View style={styles.statusGrid}>
+            <StatusItem
+              icon="clock"
+              label="Chờ xác nhận"
+              onPress={navigateToHistory}
             />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity onPress={() => setEditNameModal(false)} style={styles.cancelBtn}>
-                <Text style={styles.cancelText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleUpdateName} style={styles.saveBtn}>
-                <Text style={styles.saveText}>Cập nhật</Text>
-              </TouchableOpacity>
-            </View>
+            <StatusItem
+              icon="truck"
+              label="Đang giao"
+              onPress={navigateToHistory}
+            />
+            <StatusItem
+              icon="check-circle"
+              label="Hoàn thành"
+              onPress={navigateToHistory}
+            />
+            <StatusItem
+              icon="star"
+              label="Đánh giá"
+              onPress={navigateToHistory}
+            />
           </View>
         </View>
-      </Modal>
-    </Animated.View>
+
+        {/* MENU */}
+        <View style={styles.menuContainer}>
+          <MenuItem
+            icon="user"
+            label="Thông tin cá nhân"
+            onPress={() => router.push("/lish-profile")}
+          />
+          <MenuItem
+            icon="phone"
+            label={userData?.numphone || "Liên kết số điện thoại"}
+          />
+          <MenuItem
+            icon="key"
+            label="Đổi mật khẩu"
+            onPress={() => router.push("/(auth)/change-password")}
+          />
+          <MenuItem icon="help-circle" label="Hỗ trợ khách hàng" isLast />
+        </View>
+
+        {/* LOGOUT */}
+        {userData && (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Đăng xuất</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.version}>HEDIO FOOD APP v1.0.0</Text>
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
+/* ===== COMPONENT CON ===== */
+
+const StatusItem = ({ icon, label, onPress }: any) => (
+  <TouchableOpacity style={styles.statusItem} onPress={onPress}>
+    <View style={styles.statusIconBg}>
+      <Feather name={icon} size={20} color={COLORS.primary} />
+    </View>
+    <Text style={styles.statusLabel}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const MenuItem = ({ icon, label, onPress, isLast }: any) => (
+  <TouchableOpacity
+    style={[styles.menuRow, !isLast && styles.menuBorder]}
+    onPress={onPress}
+  >
+    <View style={styles.menuLeft}>
+      <Feather name={icon} size={18} color={COLORS.dark} />
+      <Text style={styles.menuText}>{label}</Text>
+    </View>
+    <Feather name="chevron-right" size={16} color="#C7C7CC" />
+  </TouchableOpacity>
+);
+
+/* ===== STYLE ===== */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  header: { alignItems: 'center', marginTop: 50, marginBottom: 30 },
-  avatarWrapper: { position: 'relative' },
-  avatarContainer: {
-    padding: 3,
-    borderRadius: 60,
-    borderWidth: 2,
-    borderColor: '#C62828',
-  },
-  avatar: { width: 100, height: 100, borderRadius: 50 },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 5,
-    backgroundColor: '#C62828',
-    borderRadius: 15,
-    padding: 6,
-    borderWidth: 2,
-    borderColor: '#0f172a',
-  },
-  username: { color: 'white', fontSize: 24, fontWeight: 'bold', marginTop: 15 },
-  email: { color: '#94a3b8', fontSize: 14, marginTop: 4 },
-  
-  statsRow: { 
-    flexDirection: 'row', 
-    backgroundColor: '#1e293b', 
-    marginHorizontal: 20, 
-    borderRadius: 15, 
-    paddingVertical: 15,
-    marginBottom: 30 
-  },
-  statBox: { flex: 1, alignItems: 'center' },
-  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#334155' },
-  statCount: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  statLabel: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  center: { justifyContent: "center", alignItems: "center" },
 
-  sectionTitle: { color: '#64748b', fontSize: 13, fontWeight: 'bold', marginLeft: 25, marginBottom: 10, textTransform: 'uppercase' },
-  menuContainer: { backgroundColor: '#1e293b', marginHorizontal: 20, borderRadius: 20, marginBottom: 25, overflow: 'hidden' },
-  menuItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: 15, 
-    paddingHorizontal: 15,
-    borderBottomWidth: 0.5, 
-    borderBottomColor: '#334155' 
+  header: {
+    paddingTop: Platform.OS === "android" ? 40 : 60,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  iconBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  menuText: { flex: 1, color: 'white', fontSize: 15, marginLeft: 15 },
+  headerTitle: { fontSize: 28, fontWeight: "800", color: COLORS.dark },
+  headerSubtitle: { color: COLORS.secondary, marginTop: 4 },
 
-  // Modal styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: '#1e293b', borderRadius: 20, padding: 25 },
-  modalTitle: { color: 'white', fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  input: { backgroundColor: '#0f172a', color: 'white', padding: 15, borderRadius: 12, marginBottom: 20 },
-  modalButtons: { flexDirection: 'row', gap: 10 },
-  cancelBtn: { flex: 1, padding: 15, alignItems: 'center' },
-  cancelText: { color: '#94a3b8', fontWeight: '600' },
-  saveBtn: { flex: 1, backgroundColor: '#C62828', padding: 15, borderRadius: 12, alignItems: 'center' },
-  saveText: { color: 'white', fontWeight: 'bold' },
+  iconBtn: { padding: 8, backgroundColor: "#FFF", borderRadius: 50 },
+
+  scrollContent: { paddingHorizontal: 20 },
+
+  userCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+    padding: 20,
+    borderRadius: 24,
+    marginTop: 10,
+  },
+  avatar: { width: 64, height: 64, borderRadius: 32 },
+  userInfo: { flex: 1, marginLeft: 16 },
+  userName: { fontSize: 18, fontWeight: "700", color: COLORS.dark },
+  userEmail: { fontSize: 13, color: COLORS.secondary, marginTop: 4 },
+
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 4,
+  },
+  badgeText: { fontSize: 10, color: "#FFF", fontWeight: "700" },
+
+  sectionContainer: { marginTop: 24 },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: COLORS.dark },
+  seeAll: { color: COLORS.primary, fontWeight: "600" },
+
+  statusGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.white,
+    padding: 20,
+    borderRadius: 20,
+  },
+  statusItem: { alignItems: "center", width: "22%" },
+  statusIconBg: {
+    width: 44,
+    height: 44,
+    backgroundColor: "#FFF2E6",
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statusLabel: { fontSize: 11, fontWeight: "500" },
+
+  menuContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    marginTop: 24,
+  },
+  menuRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  menuBorder: { borderBottomWidth: 1, borderBottomColor: "#F2F2F7" },
+  menuLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
+  menuText: { fontSize: 15, fontWeight: "500" },
+
+  logoutBtn: {
+    marginTop: 24,
+    backgroundColor: "#FFECEC",
+    paddingVertical: 16,
+    borderRadius: 20,
+    alignItems: "center",
+  },
+  logoutText: { color: COLORS.danger, fontWeight: "700" },
+
+  version: {
+    textAlign: "center",
+    color: "#C7C7CC",
+    fontSize: 11,
+    marginTop: 30,
+  },
 });

@@ -1,111 +1,168 @@
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Feather,
+  FontAwesome5,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import * as LocalAuthentication from "expo-local-authentication";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
-  ImageBackground,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
-import { API_CONFIG } from "../../apiConfig";
+
+// --- IMPORT SERVICE ---
+import { loginUserByEmail } from "../../Services/apiService";
 
 const { width } = Dimensions.get("window");
 
-export default function ModernLogin() {
+export default function LoginScreen() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [activeInput, setActiveInput] = useState<string | null>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  // Animation states
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 0,
-        tension: 20,
-        friction: 7,
+        duration: 800,
         useNativeDriver: true,
       }),
     ]).start();
   }, []);
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
-  };
-
+  // --- LOGIC GIỮ NGUYÊN ---
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Thông báo", "Vui lòng nhập đầy đủ thông tin");
-      return;
+      return Alert.alert(
+        "Nhắc nhở",
+        "Bạn ơi, nhập đủ Email và Mật khẩu nhé!", // Đổi text cho thân thiện hơn
+      );
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await fetch(API_CONFIG.USERS);
-      const data = await response.json();
-      const userList = data.content || data;
-
-      const user = userList.find(
-        (u: any) => u.email === email.trim() && u.pass === password
+      const result = await loginUserByEmail(
+        email.toLowerCase().trim(),
+        password.trim(),
       );
 
-      if (user) {
-        await AsyncStorage.setItem("user", JSON.stringify(user));
+      const realToken = result?.token;
+      const userId = result?.id;
+
+      if (realToken && userId) {
+        const userSession = {
+          id: userId,
+          name: result?.fullName || "Foodie",
+          email: result?.email || email,
+          role: result?.role || "customer",
+        };
+
+        if (Platform.OS === "web") {
+          localStorage.setItem("userToken", realToken);
+          localStorage.setItem("userId", String(userId));
+          localStorage.setItem("userData", JSON.stringify(userSession));
+        } else {
+          await AsyncStorage.setItem("userToken", realToken);
+          await AsyncStorage.setItem("userId", String(userId));
+          await AsyncStorage.setItem("userData", JSON.stringify(userSession));
+        }
+
+        console.log("✅ Login Success: ID =", userId);
         router.replace("/(tabs)");
       } else {
-        Alert.alert("Thất bại", "Email hoặc mật khẩu không đúng");
+        Alert.alert("Lỗi", "Tài khoản không hợp lệ hoặc thiếu dữ liệu.");
       }
-    } catch (error) {
-      Alert.alert("Lỗi", "Không kết nối được máy chủ");
+    } catch (error: any) {
+      const errorMsg =
+        error.response?.data?.message || "Email hoặc mật khẩu chưa đúng.";
+      Alert.alert("Rất tiếc", errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ImageBackground
-        source={require("../../assets/images/unnamed.jpg")}
-        style={styles.backgroundImage}
-      >
-        <LinearGradient
-          colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.5)", "#000"]}
-          style={styles.gradientOverlay}
-        />
+  const handleForgotPassword = () => {
+    router.push("/(auth)/forgot-password");
+  };
 
+  const handleBiometricAuth = async () => {
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      if (!compatible) {
+        return Alert.alert(
+          "Thông báo",
+          "Thiết bị không hỗ trợ vân tay/FaceID.",
+        );
+      }
+
+      const resultAuth = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Đăng nhập nhanh để đặt món",
+        fallbackLabel: "Nhập mật khẩu",
+      });
+
+      if (resultAuth.success) {
+        const token =
+          Platform.OS === "web"
+            ? localStorage.getItem("userToken")
+            : await AsyncStorage.getItem("userToken");
+
+        if (token) {
+          router.replace("/(tabs)");
+        } else {
+          Alert.alert(
+            "Yêu cầu",
+            "Vui lòng đăng nhập thủ công lần đầu để kích hoạt.",
+          );
+        }
+      }
+    } catch (error) {
+      Alert.alert("Lỗi", "Xác thực sinh trắc học thất bại.");
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F5F8" />
+
+      {/* Background Decor Circles */}
+      <View style={styles.circleDecor1} />
+      <View style={styles.circleDecor2} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         >
           <Animated.View
             style={{
@@ -113,203 +170,380 @@ export default function ModernLogin() {
               transform: [{ translateY: slideAnim }],
             }}
           >
-            {/* Header Section */}
-            <View style={styles.headerContainer}>
-              <View style={styles.logoCircle}>
-                <Ionicons name="restaurant" size={40} color="#fff" />
+            {/* --- HEADER LOGO --- */}
+            <View style={styles.headerSection}>
+              <View style={styles.logoContainer}>
+                <Image
+                  // Placeholder logo đồ ăn (nếu không có ảnh thì dùng icon bên dưới)
+                  source={{
+                    uri: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png",
+                  }}
+                  style={styles.foodImage}
+                />
+                <View style={styles.iconBadge}>
+                  <MaterialCommunityIcons
+                    name="silverware-fork-knife"
+                    size={20}
+                    color="#FFF"
+                  />
+                </View>
               </View>
-              <Text style={styles.brandText}>
-                DISH<Text style={styles.highlightText}>DASH</Text>
-              </Text>
-              <Text style={styles.welcomeText}>
-                Khám phá hương vị tuyệt vời ngay!
-              </Text>
+              <Text style={styles.welcomeText}>Xin chào HEDIO!</Text>
+              <Text style={styles.subText}>Đăng nhập để săn món ngon ngay</Text>
             </View>
 
-            {/* Form Section */}
-            <View style={styles.formContainer}>
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Email của bạn</Text>
-                <View style={styles.inputInner}>
-                  <Ionicons
-                    name="mail-outline"
-                    size={20}
-                    color="#fff"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    placeholder="name@example.com"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    style={styles.textInput}
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
+            {/* --- FORM --- */}
+            <View style={styles.form}>
+              <InputBox
+                label="Email"
+                icon="mail"
+                placeholder="name@example.com"
+                keyboardType="email-address"
+                active={activeInput === "email"}
+                onFocus={() => setActiveInput("email")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={setEmail}
+                value={email}
+              />
+              <InputBox
+                label="Mật khẩu"
+                icon="lock"
+                placeholder="Nhập mật khẩu"
+                secure={!showPass}
+                isPass
+                active={activeInput === "pass"}
+                onFocus={() => setActiveInput("pass")}
+                onBlur={() => setActiveInput(null)}
+                showPass={showPass}
+                setShowPass={setShowPass}
+                onChangeText={setPassword}
+                value={password}
+              />
 
-              <View style={styles.inputWrapper}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.label}>Mật khẩu</Text>
-  
-                  <Pressable
-                    onPress={() => router.push("/(auth)/ForgotPassword")}
-                  >
-                    <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.inputInner}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color="#fff"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    placeholder="••••••••"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    style={styles.textInput}
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                  />
-                  <Pressable onPress={() => setShowPassword(!showPassword)}>
-                    <Ionicons
-                      name={showPassword ? "eye-outline" : "eye-off-outline"}
-                      size={20}
-                      color="#fff"
-                    />
-                  </Pressable>
-                </View>
-              </View>
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                style={styles.forgotBtn}
+              >
+                <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+              </TouchableOpacity>
 
-              {/* Login Button with Scale Animation */}
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <Pressable
-                  onPress={handleLogin}
-                  onPressIn={handlePressIn}
-                  onPressOut={handlePressOut}
-                  disabled={loading}
+              {/* MAIN BUTTON */}
+              <TouchableOpacity
+                onPress={handleLogin}
+                disabled={loading}
+                style={styles.shadowBtn}
+              >
+                <LinearGradient
+                  colors={["#FF8C00", "#FF4500"]} // Gradient Cam -> Đỏ
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.mainBtn}
                 >
-                  <LinearGradient
-                    colors={["#E53935", "#C62828"]}
-                    style={styles.loginBtn}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.loginBtnText}>Đăng nhập</Text>
-                    )}
-                  </LinearGradient>
-                </Pressable>
-              </Animated.View>
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.mainBtnText}>ĐĂNG NHẬP NGAY</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.footerContainer}>
-                <Text style={styles.footerText}>Bạn chưa có tài khoản? </Text>
-                <Pressable onPress={() => router.push("/(auth)/Register")}>
-                  <Text style={styles.signupText}>Đăng ký ngay</Text>
-                </Pressable>
+            {/* --- SOCIAL LOGIN --- */}
+            <View style={styles.socialSection}>
+              <Text style={styles.dividerText}>Hoặc tiếp tục với</Text>
+
+              <View style={styles.socialRow}>
+                <SocialButton
+                  icon={
+                    <FontAwesome5 name="google" size={20} color="#DB4437" />
+                  }
+                  bgColor="#FFF"
+                />
+                <SocialButton
+                  icon={
+                    <FontAwesome5 name="facebook-f" size={20} color="#4267B2" />
+                  }
+                  bgColor="#FFF"
+                />
+
+                {/* Biometric Button */}
+                <TouchableOpacity
+                  style={[styles.socialBtn, styles.bioBtn]}
+                  onPress={handleBiometricAuth}
+                >
+                  <MaterialCommunityIcons
+                    name="fingerprint"
+                    size={24}
+                    color="#FF6B6B"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
+
+            {/* --- FOOTER --- */}
+            <TouchableOpacity
+              style={styles.footer}
+              onPress={() => router.push("/(auth)/register")}
+            >
+              <Text style={styles.footerText}>
+                Bạn chưa có tài khoản?{" "}
+                <Text style={styles.footerLink}>Đăng ký</Text>
+              </Text>
+            </TouchableOpacity>
           </Animated.View>
         </ScrollView>
-      </ImageBackground>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
+// --- COMPONENTS ---
+
+const InputBox = ({
+  label,
+  icon,
+  active,
+  isPass,
+  showPass,
+  setShowPass,
+  secure,
+  ...props
+}: any) => (
+  <View style={styles.inputWrapper}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <View
+      style={[
+        styles.inputContainer,
+        active ? styles.inputActive : styles.inputInactive,
+      ]}
+    >
+      <Feather name={icon} size={20} color={active ? "#FF6B6B" : "#A0A0A0"} />
+      <TextInput
+        style={styles.textInput}
+        placeholderTextColor="#C4C4C4"
+        autoCapitalize="none"
+        secureTextEntry={secure}
+        {...props}
+      />
+      {isPass && (
+        <TouchableOpacity onPress={() => setShowPass(!showPass)}>
+          <Ionicons
+            name={showPass ? "eye-off" : "eye"}
+            size={20}
+            color="#A0A0A0"
+          />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
+
+const SocialButton = ({ icon, bgColor }: any) => (
+  <TouchableOpacity style={[styles.socialBtn, { backgroundColor: bgColor }]}>
+    {icon}
+  </TouchableOpacity>
+);
+
+// --- STYLES ---
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  backgroundImage: { flex: 1 },
-  gradientOverlay: { ...StyleSheet.absoluteFillObject },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 24,
+  container: {
+    flex: 1,
+    backgroundColor: "#F5F5F8", // Màu nền sáng nhẹ
   },
-  headerContainer: {
+  // Họa tiết trang trí nền
+  circleDecor1: {
+    position: "absolute",
+    top: -50,
+    left: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(255, 107, 107, 0.1)", // Cam nhạt
+  },
+  circleDecor2: {
+    position: "absolute",
+    top: 50,
+    right: -30,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(255, 197, 41, 0.15)", // Vàng nhạt
+  },
+  scrollContent: {
+    paddingHorizontal: 30,
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+
+  // Header Style
+  headerSection: {
     alignItems: "center",
     marginBottom: 40,
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#C62828",
+  logoContainer: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+    position: "relative",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 15,
+    backgroundColor: "#FFF",
+    borderRadius: 50,
     elevation: 10,
-    shadowColor: "#C62828",
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowColor: "#FF6B6B",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
   },
-  brandText: {
-    fontSize: 42,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: 2,
+  foodImage: {
+    width: 60,
+    height: 60,
+    resizeMode: "contain",
   },
-  highlightText: { color: "#C62828" },
-  welcomeText: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.7)",
-    marginTop: 5,
-    textAlign: "center",
-  },
-  formContainer: {
-    gap: 25,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    padding: 20,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    backdropFilter: "blur(10px)", // Lưu ý: React Native chuẩn chưa hỗ trợ blur kiểu web, hiệu ứng này từ translucent bg
-  },
-  inputWrapper: { gap: 10 },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  iconBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#FF6B6B",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
-  label: {
-    color: "#fff",
+  welcomeText: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#2D2D2D",
+    marginBottom: 8,
+  },
+  subText: {
+    fontSize: 14,
+    color: "#9A9A9A",
+  },
+
+  // Form Style
+  form: {
+    gap: 20,
+  },
+  inputWrapper: {
+    gap: 8,
+  },
+  inputLabel: {
     fontSize: 14,
     fontWeight: "600",
-    marginLeft: 5,
+    color: "#2D2D2D",
+    marginLeft: 4,
   },
-  forgotText: { color: "#E53935", fontSize: 13 },
-  inputInner: {
+  inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    height: 60,
+    height: 55,
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
-  inputIcon: { marginRight: 10 },
+  inputInactive: {
+    borderColor: "#F0F0F0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  inputActive: {
+    borderColor: "#FF6B6B",
+    elevation: 4,
+    shadowColor: "#FF6B6B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
   textInput: {
     flex: 1,
-    color: "#fff",
-    fontSize: 16,
+    marginLeft: 10,
+    color: "#333",
+    fontSize: 15,
   },
-  loginBtn: {
-    height: 60,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
+  forgotBtn: {
+    alignSelf: "flex-end",
   },
-  loginBtnText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  footerContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
+  forgotText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
+  // Button Style
+  shadowBtn: {
+    shadowColor: "#FF6B6B",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
     marginTop: 10,
   },
-  footerText: { color: "rgba(255,255,255,0.7)", fontSize: 15 },
-  signupText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  mainBtn: {
+    height: 56,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mainBtnText: {
+    color: "#FFF",
+    fontWeight: "bold",
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+
+  // Social Style
+  socialSection: {
+    marginTop: 40,
+    alignItems: "center",
+  },
+  dividerText: {
+    color: "#9A9A9A",
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  socialRow: {
+    flexDirection: "row",
+    gap: 20,
+  },
+  socialBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    // Shadow
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  bioBtn: {
+    backgroundColor: "#FFF0EB", // Nền hơi hồng nhạt cho vân tay
+    borderWidth: 1,
+    borderColor: "rgba(255, 107, 107, 0.2)",
+  },
+
+  // Footer Style
+  footer: {
+    marginTop: 30,
+    alignItems: "center",
+  },
+  footerText: {
+    color: "#9A9A9A",
+    fontSize: 14,
+  },
+  footerLink: {
+    color: "#FF6B6B",
+    fontWeight: "bold",
+  },
 });

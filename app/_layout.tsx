@@ -1,37 +1,58 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import "react-native-reanimated";
+
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
+export const unstable_settings = {
+  // Vì login hiện tại nằm trong (auth)
+  initialRouteName: "(auth)",
+};
 
 export default function RootLayout() {
-  const segments = useSegments();
-  const router = useRouter();
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      // Lấy dữ liệu người dùng từ bộ nhớ
-      const user = await AsyncStorage.getItem('user');
-      const inAuthGroup = segments[0] === '(auth)';
-
-      if (!user && !inAuthGroup) {
-        // Nếu không có user và chưa ở nhóm Login -> Chuyển về Login
-        router.replace('/(auth)/Login');
-      } else if (user && inAuthGroup) {
-        // Nếu đã có user mà đang ở Login -> Vào ngay App chính
-        router.replace('/(tabs)');
-      }
-      setIsLoaded(true);
-    };
-
-    checkAuth();
-  }, [segments]); // Lắng nghe sự thay đổi của đường dẫn
-
-  if (!isLoaded) return null;
+  const colorScheme = useColorScheme();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* 1. Nhóm Auth: Chứa Login, Register, ForgotPassword */}
+        <Stack.Screen
+          name="(auth)"
+          options={{
+            animation: "fade",
+            headerShown: false,
+          }}
+        />
+
+        {/* 2. Nhóm trang chính (Tabs) */}
+        <Stack.Screen
+          name="(tabs)"
+          options={{
+            animation: "fade",
+            headerShown: false,
+          }}
+        />
+
+        {/* 3. Màn hình Chỉnh sửa hồ sơ (Để ngoài tabs để ẩn TabBar) */}
+        <Stack.Screen
+          name="edit-profile"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+            headerShown: true,
+            title: "Chỉnh sửa hồ sơ",
+          }}
+        />
+
+        {/* 4. Màn hình thông báo lỗi (Nếu có file +not-found.tsx) */}
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style="light" />
+    </ThemeProvider>
   );
 }

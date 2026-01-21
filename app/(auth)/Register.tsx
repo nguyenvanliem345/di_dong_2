@@ -1,157 +1,299 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
-  View
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { API_CONFIG } from "../../apiConfig";
 
-export default function Register() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [numphone, setNumphone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+// API
+import { registerUser } from "../../Services/apiService";
+
+export default function RegisterScreen() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [activeInput, setActiveInput] = useState<string | null>(null);
 
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    numphone: "",
+    password: "",
+    confirm: "",
+  });
+
+  // animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
   const handleRegister = async () => {
-    if (!username || !email || !numphone || !password || !confirm) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+    if (!form.username || !form.email || !form.password || !form.numphone) {
+      Alert.alert("Thông báo", "Vui lòng nhập đầy đủ thông tin.");
       return;
     }
-    if (password !== confirm) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp");
+
+    if (form.password !== form.confirm) {
+      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp.");
       return;
     }
 
     try {
       setLoading(true);
-      const newUser = {
-        username: username.trim(),
-        email: email.trim(),
-        numphone,
-        pass: password,
-        photo: "", // Mặc định trống
+
+      const payload = {
+        fullName: form.username.trim(),
+        email: form.email.trim(),
+        phone: form.numphone.trim(),
+        password: form.password,
       };
 
-      const response = await fetch(API_CONFIG.USERS, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-      });
+      await registerUser(payload);
 
-      if (!response.ok) throw new Error("Đăng ký thất bại");
-
-      Alert.alert("Thành công", "Tài khoản DishDash đã sẵn sàng! 🎉", [
-        { text: "Đăng nhập ngay", onPress: () => router.replace("/(auth)/Login") },
+      Alert.alert("Thành công 🎉", "Đăng ký tài khoản thành công!", [
+        { text: "Đăng nhập", onPress: () => router.replace("/(auth)/login") },
       ]);
-    } catch (err) {
-      Alert.alert("Lỗi", "Không thể kết nối máy chủ Railway");
+    } catch (err: any) {
+      Alert.alert(
+        "Thất bại",
+        err?.response?.data?.message || "Không thể đăng ký, vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
-      <ImageBackground source={require("../../assets/images/unnamed.jpg")} style={styles.backgroundImage}>
-        <LinearGradient colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)", "#000"]} style={styles.gradientOverlay} />
-        
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-            
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
-              <Ionicons name="chevron-back" size={24} color="#fff" />
-            </Pressable>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
-            <View style={styles.headerContainer}>
-              <Text style={styles.brandText}>DISH<Text style={styles.highlightText}>DASH</Text></Text>
-              <Text style={styles.welcomeText}>Gia nhập cộng đồng ẩm thực lớn nhất</Text>
+      {/* Background sáng */}
+      <LinearGradient
+        colors={["#fff", "#fff7ec"]}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
+          >
+            {/* LOGO */}
+            <View style={styles.logoWrap}>
+              <View style={styles.logoBox}>
+                <Text style={styles.logoText}>hedio</Text>
+              </View>
+              <Text style={styles.slogan}>Food & Delivery</Text>
             </View>
 
-            <View style={styles.formContainer}>
-              {renderInput("person-outline", "Tên hiển thị", username, setUsername)}
-              {renderInput("mail-outline", "Email", email, setEmail, "email-address")}
-              {renderInput("call-outline", "Số điện thoại", numphone, setNumphone, "phone-pad")}
-              {renderInput("lock-closed-outline", "Mật khẩu", password, setPassword, "default", true)}
-              {renderInput("shield-checkmark-outline", "Xác nhận lại", confirm, setConfirm, "default", true)}
+            <Text style={styles.title}>Tạo tài khoản</Text>
+            <Text style={styles.subtitle}>
+              Tham gia để khám phá thế giới ẩm thực 🍔
+            </Text>
 
-              <Pressable onPress={handleRegister} disabled={loading}>
-                <LinearGradient colors={["#E53935", "#C62828"]} style={styles.registerBtn}>
-                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerBtnText}>Đăng ký ngay</Text>}
-                </LinearGradient>
-              </Pressable>
+            {/* FORM */}
+            <View style={styles.form}>
+              <Input
+                label="Tên người dùng"
+                icon="user"
+                placeholder="Nguyễn Văn A"
+                active={activeInput === "user"}
+                onFocus={() => setActiveInput("user")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={(t: string) => setForm({ ...form, username: t })}
+              />
 
-              <Pressable style={styles.footerLink} onPress={() => router.replace("/(auth)/Login")}>
-                <Text style={styles.footerText}>Đã có tài khoản? <Text style={styles.loginText}>Đăng nhập</Text></Text>
-              </Pressable>
+              <Input
+                label="Email"
+                icon="mail"
+                placeholder="email@gmail.com"
+                keyboardType="email-address"
+                active={activeInput === "email"}
+                onFocus={() => setActiveInput("email")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={(t: string) => setForm({ ...form, email: t })}
+              />
+
+              <Input
+                label="Số điện thoại"
+                icon="phone"
+                placeholder="090xxxxxxx"
+                keyboardType="phone-pad"
+                active={activeInput === "phone"}
+                onFocus={() => setActiveInput("phone")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={(t: string) => setForm({ ...form, numphone: t })}
+              />
+
+              <Input
+                label="Mật khẩu"
+                icon="lock"
+                placeholder="••••••••"
+                secureTextEntry={!showPass}
+                isPass
+                showPass={showPass}
+                setShowPass={setShowPass}
+                active={activeInput === "pass"}
+                onFocus={() => setActiveInput("pass")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={(t: string) => setForm({ ...form, password: t })}
+              />
+
+              <Input
+                label="Xác nhận mật khẩu"
+                icon="shield"
+                placeholder="••••••••"
+                secureTextEntry
+                active={activeInput === "confirm"}
+                onFocus={() => setActiveInput("confirm")}
+                onBlur={() => setActiveInput(null)}
+                onChangeText={(t: string) => setForm({ ...form, confirm: t })}
+              />
+
+              <TouchableOpacity
+                style={styles.mainBtn}
+                onPress={handleRegister}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.mainBtnText}>ĐĂNG KÝ</Text>
+                )}
+              </TouchableOpacity>
             </View>
+
+            {/* LOGIN */}
+            <TouchableOpacity
+              style={styles.footer}
+              onPress={() => router.push("/(auth)/login")}
+            >
+              <Text style={styles.footerText}>
+                Đã có tài khoản?{" "}
+                <Text style={styles.footerLink}>Đăng nhập</Text>
+              </Text>
+            </TouchableOpacity>
           </Animated.View>
         </ScrollView>
-      </ImageBackground>
-    </KeyboardAvoidingView>
-  );
-}
-
-function renderInput(icon: any, label: string, value: string, onChange: (v: string) => void, kType: any = "default", secure = false) {
-  return (
-    <View style={styles.inputWrapper}>
-      <View style={styles.inputInner}>
-        <Ionicons name={icon} size={20} color="rgba(255,255,255,0.6)" />
-        <TextInput
-          style={styles.textInput}
-          placeholder={label}
-          placeholderTextColor="rgba(255,255,255,0.4)"
-          value={value}
-          onChangeText={onChange}
-          keyboardType={kType}
-          secureTextEntry={secure}
-          autoCapitalize="none"
-        />
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
+/* ---------------- INPUT COMPONENT ---------------- */
+
+const Input = ({
+  label,
+  icon,
+  active,
+  isPass,
+  showPass,
+  setShowPass,
+  ...props
+}: any) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={[styles.inputBox, active && styles.inputActive]}>
+      <Feather name={icon} size={18} color="#ff7a00" />
+      <TextInput
+        style={styles.input}
+        placeholderTextColor="#aaa"
+        autoCapitalize="none"
+        {...props}
+      />
+      {isPass && (
+        <TouchableOpacity onPress={() => setShowPass(!showPass)}>
+          <Ionicons
+            name={showPass ? "eye-off" : "eye"}
+            size={18}
+            color="#999"
+          />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
+
+/* ---------------- STYLES ---------------- */
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backgroundImage: { flex: 1 },
-  gradientOverlay: { ...StyleSheet.absoluteFillObject },
-  scrollContent: { padding: 24, paddingTop: 60 },
-  backBtn: { width: 44, height: 44, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, justifyContent: "center", alignItems: "center", marginBottom: 20 },
-  headerContainer: { marginBottom: 30 },
-  brandText: { fontSize: 38, fontWeight: "900", color: "#fff", letterSpacing: 1 },
-  highlightText: { color: "#C62828" },
-  welcomeText: { fontSize: 15, color: "rgba(255,255,255,0.6)", marginTop: 5 },
-  formContainer: { gap: 15 },
-  inputWrapper: { width: "100%" },
-  inputInner: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 16, paddingHorizontal: 16, height: 58, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  textInput: { flex: 1, marginLeft: 12, color: "#fff", fontSize: 16 },
-  registerBtn: { height: 58, borderRadius: 16, justifyContent: "center", alignItems: "center", marginTop: 10, elevation: 5 },
-  registerBtnText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  footerLink: { marginTop: 20, alignItems: "center" },
-  footerText: { color: "rgba(255,255,255,0.6)" },
-  loginText: { color: "#fff", fontWeight: "bold" },
+  scroll: { padding: 24 },
+
+  logoWrap: { alignItems: "center", marginVertical: 30 },
+  logoBox: {
+    backgroundColor: "#ff7a00",
+    paddingHorizontal: 26,
+    paddingVertical: 10,
+    borderRadius: 18,
+  },
+  logoText: { color: "#fff", fontSize: 28, fontWeight: "900" },
+  slogan: { marginTop: 6, color: "#777" },
+
+  title: { fontSize: 30, fontWeight: "bold", color: "#222" },
+  subtitle: { color: "#777", marginTop: 6, marginBottom: 24 },
+
+  form: { gap: 18 },
+
+  inputGroup: { gap: 6 },
+  label: { fontSize: 12, color: "#555", fontWeight: "600" },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 54,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  inputActive: { borderColor: "#ff7a00" },
+  input: { flex: 1, marginLeft: 10, fontSize: 15 },
+
+  mainBtn: {
+    marginTop: 10,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: "#ff7a00",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mainBtnText: { color: "#fff", fontWeight: "900", fontSize: 15 },
+
+  footer: { marginTop: 30, alignItems: "center" },
+  footerText: { color: "#777" },
+  footerLink: { color: "#ff7a00", fontWeight: "bold" },
 });

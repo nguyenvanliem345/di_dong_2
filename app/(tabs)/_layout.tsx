@@ -1,87 +1,64 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import React from "react";
 import { Platform } from "react-native";
-import { CartProvider } from "../(tabs)/components/CartContext"; // 🔥 QUAN TRỌNG
 
 export default function TabLayout() {
   return (
-    <CartProvider>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: "#C62828",
-          tabBarInactiveTintColor: "#94a3b8",
-          tabBarStyle: {
-            backgroundColor: "#ffffff",
-            height: Platform.OS === "ios" ? 90 : 70,
-            paddingBottom: Platform.OS === "ios" ? 30 : 10,
-          },
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: "#1D1D1F",
+        tabBarInactiveTintColor: "#C7C7CC",
+        tabBarStyle: {
+          backgroundColor: "#FFFFFF",
+          borderTopWidth: 0,
+          elevation: 0,
+          height: Platform.OS === "ios" ? 88 : 60,
+          paddingBottom: Platform.OS === "ios" ? 30 : 10,
+        },
+      }}
+    >
+      {/* 1. Trang chủ */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Feather name="grid" size={22} color={color} />
+          ),
         }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Trang chủ",
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? "home" : "home-outline"}
-                size={24}
-                color={color}
-              />
-            ),
-          }}
-        />
+      />
 
-        <Tabs.Screen
-          name="menu"
-          options={{
-            title: "Menu",
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? "restaurant" : "restaurant-outline"}
-                size={24}
-                color={color}
-              />
-            ),
-          }}
-        />
+      {/* 2. Tìm kiếm */}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Feather name="search" size={22} color={color} />
+          ),
+        }}
+      />
 
-        <Tabs.Screen
-          name="orders"
-          options={{
-            title: "Đơn hàng",
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? "receipt" : "receipt-outline"}
-                size={24}
-                color={color}
-              />
-            ),
-          }}
-        />
+      {/* 3. Giỏ hàng */}
+      <Tabs.Screen
+        name="cart"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Feather name="shopping-bag" size={22} color={color} />
+          ),
+        }}
+      />
 
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Cá nhân",
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? "person" : "person-outline"}
-                size={24}
-                color={color}
-              />
-            ),
-          }}
-        />
-
-        {/* ===== ẨN CÁC SCREEN PHỤ ===== */}
-        <Tabs.Screen
-          name="components/ProductDetailScreen"
-          options={{ href: null }}
-        />
-        <Tabs.Screen name="components/ChatScreen" options={{ href: null }} />
-        <Tabs.Screen name="components/MenuDiscovery" options={{ href: null }} />
-      </Tabs>
-    </CartProvider>
+      {/* 6. Hồ sơ (Đứng cuối cùng) */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Feather name="user" size={22} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
